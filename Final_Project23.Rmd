@@ -1,0 +1,609 @@
+---
+title: "R for Big Data - Project Documentation"
+author: "Nwabo Ndeffo Cyrille"
+date: "05/05/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+The shiny package in R allows you to create interactive web applications with R code running behind the scenes. These applications can be run within a web browser, allowing you to share your analysis or visualizations with others without requiring them to have R installed on their computer. Shiny can be a useful tool for quickly creating proof-of-concept applications, as well as for building more complex web applications.
+
+## Folders and files:
+
+The app.R file contains both the server and the UI code for a Shiny app.
+
+the AirBnB.RData file contains data related to AirBnB listings in Paris. Specifically, it includes a data frame called L with information such as the property type, neighborhood, number of reviews, price, and availability for each listing. This data is used in the Shiny app to create interactive visualizations and explore the AirBnB listings in Paris.
+
+## Exercise:
+
+We were asked to explore and analyse the `airbnb Paris dataset` creating a shiny application and should contain:
+
+Relationship between prices and apartment features: This component should allow the user to explore the relationship between the price of an Airbnb apartment in Paris and its features. The features that can be explored include the number of bedrooms, the number of bathrooms, the property type (e.g. apartment, house), and the room type (e.g. private room, entire home/apt).
+
+Number of apartments per owner: This component should allow the user to explore how many apartments each owner has listed on Airbnb in Paris. This can help to identify the most active Airbnb hosts in Paris.
+
+Renting price per city quarter ("arrondissements"): This component should allow the user to explore the average price of Airbnb apartments in each of the 20 arrondissements (districts) of Paris. This can help to identify which arrondissements are the most expensive to stay in.
+
+Visit frequency of the different quarters according to time: This component should allow the user to explore the frequency of Airbnb bookings in each of the 20 arrondissements of Paris over time. This can help to identify the most popular arrondissements to stay in during different seasons of the year.
+
+## Approach
+
+started with a clear understanding of the variables that will be used in the analysis:
+Room type  <-  This feature helps to understand the type of accommodation available in the listings, such as entire homes, private rooms, or shared rooms. This information is important for users who have preferences for different types of accommodations.
+
+Property type <-  This feature describes the type of property available in the listings, such as apartments, houses, or lofts. This information can help users to find the type of property they are interested in.
+
+Location  <- This feature provides information on the geographical location of the listings in Paris, which is important for users who are interested in staying in specific areas of the city or who want to explore different neighborhoods.
+
+Price <- This feature is a key factor for users when choosing a listing. By exploring the relationship between price and other features, such as room and property types, it is possible to understand the factors that influence the price of AirBnB listings in Paris.
+
+Neighborhood <- This feature provides information on the different neighborhoods in Paris where the listings are located. This information is important for users who are interested in specific areas of the city
+
+Type of owner  <- This feature distinguishes between hosts and superhosts, which can help users to choose a listing based on the host's experience and reputation.
+
+
+# Creating an interactive website with the Shiny package
+
+## Prerequisites
+
+install the shiny package and its dependencies:
+install.packages("shinyjs", dependencies=TRUE)
+devtools::install_github("rstudio/EDAWR")
+
+# loading the necessary packages :
+
+```{r, include=TRUE}
+library(shiny)
+library(stringr)
+library(shinydashboard)
+library(shinycssloaders)
+library(DT)
+library(plotly)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(shinyalert)
+library(forcats)
+library(purrr)
+library(ggmap)
+library(RColorBrewer)
+library(tidyverse)
+library(tidyr)
+library(ggpubr)
+library(EDAWR)
+```
+
+
+## Before starting with the analysis, we need to preprocess the dataset to make it ready for our purpose. 
+
+Load the dataset:
+
+```{r, include=TRUE}
+data <- load("C:/Users/selfe/Documents/DSTI/R_Coding/Final_Project23/AirBnB_Paris.Rdata")
+
+```
+
+the original dataset contains the lists L and R :
+```{r echo=TRUE}
+head(L)
+
+```
+
+```{r echo=TRUE}
+head(R)
+```
+
+
+The 'L' list contains variables (room_type, property_type, neighborhood, price, and host_is_superhost) related to the features of the AirBnB listings in Paris 
+
+
+the R list contains variables ( date, day_of_week, and quarter) related to the time of the year when the listings are booked. 
+
+
+the select clause is used to create a subset of the 'L' dataset with only the useful variables for the project::
+```{r echo=TRUE}
+new_L <- select(L, listing_id = id, host_id, host_name,        bathrooms, bedrooms, beds, bed_type, equipments= amenities, type= property_type, room= room_type, 
+                              nb_of_guests= accommodates, price, guests_included, minimum_nights, 
+                              maximum_nights,availability_over_one_year= availability_365, instant_bookable, 
+                              cancellation_policy, city, address= street, neighbourhood=neighbourhood_cleansed, 
+                              city_quarter=zipcode, latitude, longitude, security_deposit, transit, 
+                              host_response_time, superhost= host_is_superhost, host_since, 
+                              listing_count= calculated_host_listings_count, host_score= review_scores_rating, 
+                              reviews_per_month, number_of_reviews)
+```
+
+```{r echo=TRUE}
+head(new_L)
+```
+
+a new data frame with only the unique rows of the new_L data frame is created, based on the listing_id column, while keeping all the columns in the original data frame that have unique combinations of values in the listing_id column.:
+
+new_L %>% distinct(listing_id, .keep_all = TRUE)`
+
+remove the comma separator from the price column and convert the data type from factor to character, and then take a substring of the price starting from the second character to remove the `$`  sign at the beginning of the price:
+
+```{r echo=TRUE}
+new_L$price <- substring(gsub(",", "", as.character(new_L$price)),2)
+```
+
+setting the correct variable types:
+
+Converting numeric columns:
+```{r echo=TRUE}
+new_L$bathrooms <- as.numeric(new_L$bathrooms)
+new_L$bedrooms <- as.numeric((new_L$bedrooms))
+new_L$beds <- as.numeric((new_L$beds))
+new_L$price <- as.numeric((new_L$price))
+new_L$guests_included <- as.numeric((new_L$guests_included))
+new_L$minimum_nights <- as.numeric((new_L$minimum_nights))
+new_L$maximum_nights <- as.numeric((new_L$maximum_nights))
+new_L$availability_over_one_year <- as.numeric((new_L$availability_over_one_year))
+new_L$security_deposit <- as.numeric((new_L$security_deposit))
+new_L$listing_count <- as.numeric((new_L$listing_count))
+new_L$host_score <- as.numeric((new_L$host_score))
+new_L$reviews_per_month <- as.numeric((new_L$reviews_per_month))
+new_L$number_of_reviews <- as.numeric((new_L$number_of_reviews))
+```
+
+the neighbourhood column to character:
+```{r echo=TRUE}
+new_L$neighbourhood <- as.character(new_L$neighbourhood)
+```
+
+setting the price range of interest for the analysis
+```{r echo=TRUE}
+new_L <- new_L %>% filter(new_L$price >= 0 & new_L$price <= 100)
+```
+
+
+Notice that there are missing values for some columns. given the size of the dataset and the fact that only a small percentage of the values are missing, filling the missing values with the mean value is a reasonable approach. (bathrooms, bedrooms, beds and prices):
+```{r echo=TRUE}
+x <- mean(new_L$bathrooms, na.rm = TRUE)
+y <- is.na(new_L$bathrooms)
+new_L$bathrooms[y] <- x
+```
+
+
+```{r echo=TRUE}
+x <- mean(new_L$bedrooms, na.rm = TRUE)
+y <- is.na(new_L$bedrooms)
+new_L$bedrooms[y] <- x
+```
+
+
+```{r echo=TRUE}
+x <- mean(new_L$beds, na.rm = TRUE)
+```
+
+
+```{r echo=TRUE}
+y <- is.na(new_L$beds)
+```
+
+
+```{r echo=TRUE}
+new_L$beds[y] <- x
+```
+
+
+
+```{r echo=TRUE}
+x = mean(new_L$price,na.rm = TRUE)
+```
+
+
+```{r echo=TRUE}
+y = is.na(new_L$price) 
+new_L$price[y] = x
+```
+
+The new_L is now cleaned, let's Print the first rows rows of our new dataset:
+```{r echo=TRUE}
+head(new_L)
+```
+
+And also the summary:
+```{r echo=TRUE}
+summary(new_L)
+```
+
+
+## Analysis
+
+### Relationship between prices and apartment features:
+
+- Price:
+
+```{r echo=TRUE}
+summary(new_L$price)
+```
+
+```{r echo=TRUE}
+p1<- ggplot(new_L) + 
+  geom_histogram(aes(price), fill = "#971a4a", alpha = 0.85, binwidth = 15) + 
+  theme_minimal(base_size = 13) + 
+  xlab("Price") + 
+  ylab("Frequency") + 
+  ggtitle("Distribution of Price")
+
+p2 <- ggplot(new_L, aes(price)) +
+  geom_histogram(bins = 30, aes(y = ..density..), fill = "#971a4a") + 
+  geom_density(alpha = 0.2, fill = "#971a4a") + 
+  ggtitle("Logarithmic distribution of Price", subtitle = expression("With" ~'log'[10] ~ "transformation of x-axis")) + 
+  scale_x_log10()
+
+
+ggarrange(p1,
+          p2,
+          nrow = 1,
+          ncol=2,
+          labels = c("1. ", "2. "))
+```
+
+In the logarithmic distribution of the variable `price` a better insight view of this variable can be perceived. 
+
+
+- Property type:
+
+```{r echo=TRUE}
+new_L %>%distinct(type)
+``` 
+
+creates a bar chart of the number of listings according to property types. :
+```{r echo=TRUE}
+property_type_count <- table(new_L$type)
+property_types_counts <- table(new_L$type,exclude=names(property_type_count[property_type_count[] < 4000]))
+others <- sum(as.vector(property_type_count[property_type_count[] < 4000]))
+property_types_counts['Others'] <- others
+property_types <- names(property_types_counts)
+counts <- as.vector(property_types_counts)
+percentages <- scales::percent(round(counts/sum(counts), 2))
+property_types_percentages <- sprintf("%s (%s)", property_types, percentages)
+property_types_counts_df <- data.frame(group = property_types, value = counts)
+res1 <- ggplot(property_types_counts_df, aes(x="",y=value, fill=property_types_percentages)) +
+  geom_bar(width = 1,stat = "identity") +
+  coord_polar("y",start = 0) +
+  scale_fill_brewer("Property Types",palette = "BuPu")+
+  ggtitle("Listings according to property types") +
+  theme(plot.title = element_text(color = "Black", size = 12, hjust = 0.5))+
+  ylab("") +
+  xlab("") +
+  theme(axis.ticks = element_blank(), panel.grid = element_blank(), axis.text = element_blank()) +
+  geom_text(aes(label = percentages), size= 4, position = position_stack(vjust = 0.5))
+
+res1
+```
+
+97% of property type are apartment 
+
+produce a boxplot that shows the distribution of prices across different property types.:
+```{r echo=TRUE}
+ggplot(new_L) +  
+  geom_boxplot(aes(x = type,y = price,fill = type)) +
+  labs(x = "Property Type",y = "Price",fill = "Property Type") +  
+  coord_flip()
+```
+
+
+We can see that some property types are more expensive than the average, this property types are: Villa, Townhouse, House and Camper/RV. Since in the dataset the 96% of the listings are of type apartment, less than 4% lays in those property types.
+
+
+- Room type:
+
+```{r echo=TRUE}
+new_L %>%distinct(room)
+``` 
+There exists three types of rooms: Entire home/apt, Private room and Shared room.
+
+Listing types according to the room type:
+```{r echo=TRUE}
+room_types_counts <- table(new_L$room)
+room_types <- names(room_types_counts)
+counts <- as.vector(room_types_counts)
+percentages <- scales::percent(round(counts/sum(counts), 2))
+room_types_percentages <- sprintf("%s (%s)", room_types, percentages)
+room_types_counts_df <- data.frame(group = room_types, value = counts)
+
+res2 <- ggplot(room_types_counts_df, aes(x = "", y = value, fill = room_types_percentages)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) +
+  scale_fill_brewer("Room Types", palette = "BuPu") +
+  ggtitle("Listing types according to Room types") +
+  theme(plot.title = element_text(color = "black", size = 12, hjust = 0.5)) +
+  ylab("") +
+  xlab("") +
+  labs(fill="") +
+  theme(axis.ticks = element_blank(), panel.grid = element_blank(), axis.text = element_blank()) +
+  geom_text(aes(label = percentages), size = 5, position = position_stack(vjust = 0.5))
+
+res2
+```
+
+ 82% of the listings are entire apartments.
+
+
+Price by room type:
+```{r echo=TRUE}
+ggplot(new_L)+ 
+  geom_boxplot(aes(x = room,y = price, fill = room)) + 
+  labs(x = "Room Type", y = "Price", fill = "Room Type")+ 
+  coord_flip()
+```
+
+The price of  shared room  is lower than private room 
+while The price of   private room is lower than entire home/apt. 
+
+let's use a bar chart to show the mean price of each room type.:
+ 
+ ```{r echo=TRUE}
+ggplot(new_L)+ 
+    geom_boxplot(aes(x = room,y = price, fill = room)) + 
+    labs(x = "Room Type", y = "Price", fill = "Room Type")+ 
+    coord_flip()
+
+new_L %>% 
+    group_by(room) %>% 
+    summarise(mean_price = mean(price, na.rm = TRUE)) %>% 
+    ggplot(aes(x = reorder(room, mean_price), y = mean_price, fill = room)) +
+    geom_col(fill="#971a4a") +
+    coord_flip() +
+    theme_minimal() +
+    labs(x = "Room Type", y = "Price") +
+    geom_text(aes(label = round(mean_price,digit = 2)), hjust = 1.0, color = "white", size = 4.5) +
+    ggtitle("Mean Price / Room Types") + 
+    xlab("Room Type") + 
+    ylab("Mean Price")
+```
+mean price of shared room < mean price of private room  < mean price entire room
+
+-  2 boxplot showing the relationship between price and cancellation policy / 
+relationship between price and host response time:
+```{r echo=TRUE}
+price_cancellation_policy <- ggplot(data = new_L, 
+  aes(x = cancellation_policy, y = price, color=cancellation_policy)) +
+  geom_boxplot(outlier.shape = NA) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  theme(plot.title = element_text(color = "#971a4a", size = 12, face = "bold", hjust = 0.5))+
+  coord_cartesian(ylim = c(0, 500))
+
+host_data_without_null_host_response_time <- subset(new_L, host_response_time != "N/A" & host_response_time != "")
+
+price_response_time <- ggplot(data = host_data_without_null_host_response_time, 
+  aes(x = host_response_time, y = price, color = host_response_time)) + 
+  geom_boxplot(outlier.shape = NA) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  theme(plot.title = element_text(color = "#971a4a", size = 12, face = "bold", hjust = 0.5)) +
+  coord_cartesian(ylim = c(0, 500))
+
+ggarrange(price_response_time,
+          price_cancellation_policy,
+          nrow = 1,
+          ncol = 2,
+          labels = c("1. ", "2. "))
+```
+
+We can observe no relation in the first graph between the host response time and the price but, on the second graph we can see that the cancellation policy doesn't have an impact on the price depending on its type 
+
+- creates a boxplot to compare the prices of listings that are instantly bookable versus those that are not:
+
+```{r echo=TRUE}
+ggplot(data = new_L, aes(x = instant_bookable, y = price, color = instant_bookable)) +
+       geom_boxplot(outlier.shape = NA) +coord_cartesian(ylim = c(0, 500))
+```
+
+No clear dependency with this feature.
+
+- relationship between the availability of the listing over a year and the price:
+
+```{r echo=TRUE}
+ggplot(new_L, aes(availability_over_one_year, price)) +
+  geom_point(alpha = 0.2, color = "#971a4a") +
+  geom_density(stat = "identity", alpha = 0.2) +
+  xlab("Availability over a year") +
+  ylab("Price") +
+  ggtitle("Relationship between availability and price") 
+```
+
+No clear dependency with this feature.
+
+### Number of apartments per owner:
+
+- Hosts:
+```{r echo=TRUE}
+count_by_host_1 <- new_L %>% 
+  group_by(host_id) %>%
+  summarise(number_apt_by_host = n()) %>%
+  ungroup() %>%
+  mutate(groups = case_when(
+    number_apt_by_host == 1 ~ "001",
+    between(number_apt_by_host, 2,10) ~ "002-010",
+    number_apt_by_host > 10 ~ "011-153"))
+
+count_by_host_2 <- count_by_host_1 %>%
+  group_by(groups) %>%
+  summarise(counting = n()) %>%
+  arrange(desc(counting), .by_group = TRUE)
+
+num_apt_by_host_id <- (ggplot(count_by_host_2, aes(x = "", y = counting)) +  
+              geom_col(aes(fill = factor(groups)), color = "white") + 
+              geom_text(aes(y = counting / 1.23, label = counting),color = "black",size = 4)+ 
+              labs(x = "", y = "", fill = "Number of apartments per owner") + 
+              coord_polar(theta = "y"))+
+              theme_minimal()
+
+superhost <- (ggplot(new_L) + 
+                geom_bar(aes(x='' , fill=superhost)) +
+                coord_polar(theta='y') +
+                scale_fill_brewer(palette="BuPu")) +
+                theme_minimal()
+
+ggarrange(num_apt_by_host_id,
+          superhost,
+          nrow=2,
+          ncol=1,
+          align = "hv")
+```
+
+Most of the hosts have only one listing. There is also a minority of superhosts.
+
+Top 20 hosts in Paris:
+```{r echo=TRUE}
+count_by_host_3 <- new_L %>%
+  group_by(host_id) %>%
+  summarise(number_apt_by_host = n()) %>%
+  arrange(desc(number_apt_by_host))
+
+top_listings_by_host <- count_by_host_3 %>%
+  top_n(n=20, wt = number_apt_by_host)
+
+knit_print.data.frame <- top_listings_by_host
+
+knit_print.data.frame 
+```
+
+
+### Renting price per city quarter:
+
+```{r echo=TRUE}
+listings_quarter <- ggplot(new_L, aes(x = fct_infreq(neighbourhood), fill = room)) +
+    geom_bar() +
+    labs(title = "Nb. Listings per city quarter",
+         x = "Neighbourhood", y = "Nb. of listings") +
+    theme(legend.position = "bottom",axis.text.x = element_text(angle = 90, hjust = 1), 
+          plot.title = element_text(color = "black", size = 12,  hjust = 0.5))
+
+average_prices <- aggregate(cbind(new_L$price),
+                  by = list(arrond = new_L$city_quarter),
+                  FUN = function(x) mean(x))
+
+price <- ggplot(data = average_prices, aes(x = arrond, y = V1)) +
+    geom_bar(stat = "identity", fill = "#971a4a", width = 0.7) +
+  geom_text(aes(label = round(V1, 2)), size=4) +
+    coord_flip() +
+    labs(title = "Average daily price per city quarter", 
+         x = "City quarters", y = "Average daily price") +
+    theme(legend.position = "bottom",axis.text.x = element_text(angle = 90, hjust = 1), 
+          plot.title = element_text(color = "black", size = 12,  hjust = 0.5))
+
+ggarrange(listings_quarter,
+          price,
+          nrow =1,
+          ncol = 2,
+          labels = c("1. ", "2. "))
+  
+```
+
+
+ displays a bar chart of the top 10 neighborhoods with the most listings:
+```{r echo=TRUE}
+new_L %>%
+  group_by(neighbourhood) %>%
+  dplyr::summarize(num_listings = n(), borough = unique(neighbourhood)) %>%
+  top_n(n = 10, wt = num_listings) %>%
+  ggplot(aes(x = fct_reorder(neighbourhood, num_listings), y = num_listings, fill = borough)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Top 10 neighborhoods by nb. of listings", x = "Neighbourhood", y = "Nb. of listings")
+```
+
+
+number of rented apartments over time for each neighborhood:
+```{r echo=TRUE}
+new_data <- inner_join(new_L, R, by = "listing_id")
+new_data = mutate(new_data,year = as.numeric(str_extract(new_data$date, "^\\d{4}")))
+
+new_data["date"] <- new_data["date"] %>% map(., as.Date)
+
+longitudinal  <- new_data %>%
+  group_by(date, neighbourhood) %>%
+  summarise(count_obs = n())
+
+time_location <- (ggplot(longitudinal, aes(x = date,  y = count_obs, group = 1)) +
+                  geom_line(linewidth = 0.5, colour = "lightblue") +
+                  stat_smooth(color = "#971a4a", method = "loess") +
+                  scale_x_date(date_labels = "%Y") +
+                  labs(x = "Year", y = "Nb. Rented Appartment") +
+                  facet_wrap(~ neighbourhood))
+
+time_location
+```
+The most visited and rented locations in Paris are the cheapest ones.
+
+
+Map representing price range within Paris neighborhoods (higher the closer we are to the center Paris):
+```{r echo=TRUE}
+height <- max(new_L$latitude) - min(new_L$latitude)
+width <- max(new_L$longitude) - min(new_L$longitude)
+
+paris_limits <- c(bottom = min(new_L$latitude)  - 0.1 * height, 
+                top = max(new_L$latitude)  + 0.1 * height,
+                left = min(new_L$longitude) - 0.1 * width,
+                right = max(new_L$longitude) + 0.1 * width)
+
+map <- get_stamenmap(paris_limits, zoom = 12)
+
+ggmap(map) +
+  geom_point(data = new_L, mapping = aes(x = longitude, y = latitude, col = log(price))) +
+  scale_color_distiller(palette = "BuPu", direction = 1)
+```
+
+### Visit frequency of the different quartes according to time:
+
+```{r echo=TRUE}
+new_data <- inner_join(new_L, R, by = "listing_id")
+new_data = mutate(new_data, year = as.numeric(str_extract(new_data$date, "^\\d{4}")))
+     
+res3 <- ggplot(new_data) +
+  geom_bar(aes(y =city_quarter ,fill=factor(year))) +
+  scale_size_area() +
+  labs( x="Frequency", y="City quarter",fill="Year") +
+  scale_fill_brewer(palette ="BuPu")
+    
+ggplotly(res3)
+```
+
+
+## display geographical data
+
+ interactive map using Leaflet :
+
+### Neighborhood listings map:
+```{r echo=TRUE}
+df <- select(new_L, longitude, neighbourhood, latitude, price)
+leaflet(df %>% select(longitude, neighbourhood, latitude, price))%>%
+  setView(lng = 2.3488, lat = 48.8534, zoom = 12) %>%
+   addTiles() %>% 
+  addMarkers(clusterOptions = markerClusterOptions()) %>%
+  addMiniMap()
+```
+
+### shows only listings that are marked as "superhost":
+```{r echo=TRUE}
+dfsuperhost <- select(new_L, longitude, neighbourhood, latitude, price)
+dfsuperhost <- filter(new_L, superhost =="t")
+leaflet(dfsuperhost %>% select(longitude, neighbourhood, latitude, price))%>%
+  setView(lng = 2.3488, lat = 48.8534 ,zoom = 12) %>%
+   addTiles() %>% 
+  addMarkers(clusterOptions = markerClusterOptions()) %>%
+  addMiniMap()
+```
+
+
+# Conclusion
+
+ the analysis showed that the majority of the listings are concentrated in the central areas of Paris, with a higher concentration around popular touristic areas. The top 10 neighborhoods by the number of listings are located in the central areas of Paris. The longitudinal analysis revealed that the number of rented apartments has been increasing over time, which could be an indicator of the growth of the tourism industry in Paris.
+
+ It seems like the majority of hosts on the platform are individuals renting out their own homes or apartments, rather than commercial operators with multiple listings.`.
+
+The dataset only includes AirBnB listings, so it may not necessarily reflect the entire rental market in Paris. However, The closer the apartment is to the center of Paris, the more expensive it is. The neighborhood in Paris with the highest number of listings is `Butter-Montmartre`  
+
+It is possible that people prefer to rent entire homes/apartments because they provide more privacy and comfort, especially for families or larger groups. Additionally, people may prefer this option because it allows them to have a full kitchen and other amenities, which can save them money compared to eating out every meal.
+
+Regarding the Butter-Montmartre neighborhood, it is possible that this neighborhood is popular among tourists for its location and attractions. It is close to popular tourist destinations like the Sacré-Cœur Basilica and the Moulin Rouge, and it also has a variety of restaurants, bars, and shops. This may make it an attractive location for people visiting Paris.
+
+Finally, there is a minority of `superhosts` in comparison to `hosts`. Becoming a superhost on Airbnb requires meeting certain criteria, such as maintaining a high overall rating, receiving a certain number of bookings, and having a low cancellation rate, among others. So it's not surprising that only a minority of hosts achieve this status. However, being a superhost can be beneficial for hosts as it can lead to more bookings and higher income.
